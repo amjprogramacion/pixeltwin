@@ -1,0 +1,25 @@
+# Build output
+build/
+ 
+# Wails generated bindings (se regeneran con wails dev)
+frontend/wailsjs/
+ 
+# Frontend build
+frontend/dist/
+frontend/node_modules/
+ 
+# Go
+*.exe
+*.dll
+*.so
+*.dylib
+ 
+# Cache de hashes e historial (datos locales del usuario)
+*.json
+ 
+# Temp
+*.tmp
+*.log
+
+assets/github.com/
+assets/golang.org/

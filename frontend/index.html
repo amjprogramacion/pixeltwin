@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>PixelTwin</title>
+  <link rel="stylesheet" href="/src/style.css"/>
+</head>
+<body>
+  <div id="app">
+
+    <!-- SIDEBAR -->
+    <aside id="sidebar">
+      <div class="logo">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="8" height="8" rx="1.5"/>
+          <rect x="13" y="3" width="8" height="8" rx="1.5"/>
+          <rect x="3" y="13" width="8" height="8" rx="1.5"/>
+          <rect x="13" y="13" width="8" height="8" rx="1.5"/>
+        </svg>
+        <span>PixelTwin</span>
+      </div>
+
+      <!-- Carpeta -->
+      <section class="side-section">
+        <label class="side-label">Carpeta</label>
+        <div class="folder-box" id="folderBox">
+          <span id="folderPath">Ninguna seleccionada</span>
+        </div>
+        <button class="btn-primary" id="btnFolder">Elegir carpeta</button>
+      </section>
+
+      <!-- Opciones -->
+      <section class="side-section">
+        <label class="side-label">Similitud mínima</label>
+        <div class="slider-row">
+          <input type="range" id="sliderSim" min="70" max="100" value="90"/>
+          <span id="simVal">90%</span>
+        </div>
+        <p class="side-hint">100% = solo duplicados exactos<br>70% = imágenes muy parecidas</p>
+      </section>
+
+      <div class="scan-wrap">
+        <button class="btn-scan" id="btnScan" disabled>Escanear</button>
+        <button class="btn-cancel" id="btnCancel" style="display:none">Parar escaneo</button>
+      </div>
+
+
+      <!-- Stats (aparecen tras el scan) -->
+      <section class="side-section stats-section" id="statsSection" style="display:none">
+        <label class="side-label">Resultado</label>
+        <div class="stat-row"><span>Imágenes</span><strong id="stFound">–</strong></div>
+        <div class="stat-row"><span>Grupos</span><strong id="stGroups">–</strong></div>
+        <div class="stat-row accent"><span>Recuperable</span><strong id="stReclaim">–</strong></div>
+        <div class="stat-row muted"><span>Tiempo</span><strong id="stTime">–</strong></div>
+      </section>
+
+      <!-- Filtro -->
+      <section class="side-section" id="filterSection" style="display:none">
+        <label class="side-label">Filtrar</label>
+        <div class="filter-btns">
+          <button class="filter-btn active" data-filter="all">Todos</button>
+          <button class="filter-btn" data-filter="exact">Exactos</button>
+          <button class="filter-btn" data-filter="similar">Similares</button>
+        </div>
+      </section>
+
+      <!-- Historial de escaneos -->
+      <div class="history-section" id="historySection" style="display:none">
+        <button class="history-toggle" id="historyToggle">
+          <span>Escaneos recientes</span>
+          <svg class="history-chevron" viewBox="0 0 12 12" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="2,4 6,8 10,4"/>
+          </svg>
+        </button>
+        <ul class="history-list" id="historyList" style="display:none"></ul>
+      </div>
+
+      <div class="app-version" id="appVersion"></div>
+    </aside>
+
+    <!-- MAIN -->
+    <main id="main">
+
+      <!-- Estado inicial -->
+      <div class="empty-state" id="emptyState">
+        <div class="empty-icon">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+        </div>
+        <h2>Selecciona una carpeta y escanea</h2>
+        <p>PixelTwin buscará imágenes duplicadas y similares,<br>incluyendo fotos de iPhone (.heic)</p>
+      </div>
+
+      <!-- Progreso -->
+      <div class="progress-state" id="progressState" style="display:none">
+        <div class="progress-label">Escaneando imágenes…</div>
+        <div class="progress-bar-wrap">
+          <div class="progress-bar-fill" id="progressFill"></div>
+        </div>
+        <div class="progress-info">
+          <span id="progressDone">0</span> / <span id="progressTotal">0</span>
+          <span id="progressPct" class="pct">0%</span>
+        </div>
+      </div>
+
+      <!-- Resultados -->
+      <div id="resultsArea" style="display:none">
+
+        <!-- Toolbar de resultados -->
+        <div class="results-toolbar">
+          <span class="results-count" id="resultsCount">0 grupos</span>
+          <div class="toolbar-actions">
+            <button class="btn-ghost" id="btnAutoSelect">Seleccionar copias</button>
+            <button class="btn-ghost" id="btnMultiSelect">Selección múltiple</button>
+            <button class="btn-ghost" id="btnClearSel">Deseleccionar todo</button>
+            <button class="btn-danger" id="btnDelete" disabled>
+              Mover a papelera
+              <span class="del-badge" id="delBadge">0</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Lista de grupos -->
+        <div id="groupsList"></div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Lightbox -->
+  <div class="lightbox" id="lightbox" style="display:none">
+    <div class="lightbox-inner">
+
+      <!-- Barra superior -->
+      <div class="lightbox-topbar">
+        <div class="lightbox-info">
+          <span class="lightbox-name" id="lightboxName"></span>
+          <span class="lightbox-meta" id="lightboxMeta"></span>
+        </div>
+        <div class="lightbox-topbar-right">
+          <span class="lightbox-counter" id="lightboxCounter"></span>
+          <button class="lightbox-close" id="lightboxClose">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <line x1="3" y1="3" x2="13" y2="13"/>
+              <line x1="13" y1="3" x2="3" y2="13"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Imagen + botones de navegación -->
+      <div class="lightbox-imgwrap">
+        <button class="lightbox-nav lightbox-prev" id="lightboxPrev">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="10,3 5,8 10,13"/>
+          </svg>
+        </button>
+
+        <div class="lightbox-img-container">
+          <img id="lightboxImg" src="" alt=""/>
+          <div class="lightbox-spinner" id="lightboxSpinner"></div>
+        </div>
+
+        <button class="lightbox-nav lightbox-next" id="lightboxNext">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6,3 11,8 6,13"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Tira de miniaturas del grupo -->
+      <div class="lightbox-strip" id="lightboxStrip"></div>
+
+    </div>
+  </div>
+
+  <!-- Modal de confirmación de borrado -->
+  <div class="modal-overlay" id="modalOverlay" style="display:none">
+    <div class="modal">
+      <h3>Confirmar borrado</h3>
+      <p id="modalMsg">¿Mover <strong>0 archivos</strong> a la papelera?</p>
+      <p class="modal-hint">Los archivos irán a la Papelera de reciclaje.<br>Puedes recuperarlos desde allí si cambias de opinión.</p>
+      <div class="modal-actions">
+        <button class="btn-ghost" id="modalCancel">Cancelar</button>
+        <button class="btn-danger" id="modalConfirm">Sí, mover a papelera</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/src/main.js" type="module"></script>
+</body>
+</html>
