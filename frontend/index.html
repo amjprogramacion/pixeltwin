@@ -21,13 +21,22 @@
         <span>PixelTwin</span>
       </div>
 
-      <!-- Carpeta -->
+      <!-- Carpetas -->
       <section class="side-section">
-        <label class="side-label">Carpeta</label>
-        <div class="folder-box" id="folderBox">
-          <span id="folderPath">Ninguna seleccionada</span>
+        <div class="folders-header">
+          <label class="side-label">Carpetas</label>
+          <button class="btn-add-folder" id="btnFolder" title="Añadir carpeta">
+            <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <line x1="7" y1="2" x2="7" y2="12"/>
+              <line x1="2" y1="7" x2="12" y2="7"/>
+            </svg>
+            Añadir carpeta
+          </button>
         </div>
-        <button class="btn-primary" id="btnFolder">Elegir carpeta</button>
+        <ul class="folder-list" id="folderList">
+          <li class="folder-list-empty" id="folderListEmpty">Ninguna seleccionada</li>
+        </ul>
       </section>
 
       <!-- Opciones -->

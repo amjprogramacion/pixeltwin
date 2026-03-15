@@ -77,16 +77,79 @@ body {
   color: var(--text3);
 }
 
-.folder-box {
+.folders-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.btn-add-folder {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 8px;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.btn-add-folder:hover { background: var(--bg3); border-color: var(--accent); }
+.btn-add-folder svg { width: 12px; height: 12px; }
+
+.folder-list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.folder-list-empty {
+  font-size: 11px;
+  color: var(--text3);
+  padding: 4px 2px;
+}
+
+.folder-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   background: var(--bg3);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  padding: 6px 9px;
+  padding: 6px 8px;
+}
+
+.folder-item-path {
+  flex: 1;
   font-size: 11px;
   color: var(--text2);
-  word-break: break-all;
-  min-height: 32px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
+
+.folder-item-remove {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  background: none;
+  border: none;
+  color: var(--text3);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  transition: color .12s, background .12s;
+}
+.folder-item-remove:hover { color: var(--red); background: rgba(224,85,85,.1); }
+.folder-item-remove svg { width: 10px; height: 10px; }
 
 .slider-row {
   display: flex;
@@ -772,6 +835,7 @@ body {
 /* ── Botón cancelar escaneo ───────────────────────── */
 .btn-cancel {
   margin: 8px 0 0;
+  width: 100%;
   background: transparent;
   color: var(--red);
   border: 1px solid var(--red);

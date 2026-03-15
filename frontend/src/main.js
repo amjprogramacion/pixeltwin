@@ -2,7 +2,7 @@ import { SelectFolder, Scan, CancelScan, DeleteFiles, OpenFile, GetHistory } fro
 import { EventsOn } from '../wailsjs/runtime/runtime.js'
 
 // ── Estado global ─────────────────────────────────
-let selectedFolder  = ''
+let selectedFolders = []  // array de rutas seleccionadas
 let scanResults     = null
 let selectedPaths   = new Set()
 let activeFilter    = 'all'
@@ -15,8 +15,9 @@ loadHistory()
 
 // ── Referencias DOM ───────────────────────────────
 const btnFolder      = document.getElementById('btnFolder')
+const folderList     = document.getElementById('folderList')
+const folderListEmpty = document.getElementById('folderListEmpty')
 const btnScan        = document.getElementById('btnScan')
-const folderPath     = document.getElementById('folderPath')
 const sliderSim      = document.getElementById('sliderSim')
 const simVal         = document.getElementById('simVal')
 const emptyState     = document.getElementById('emptyState')
@@ -63,25 +64,57 @@ sliderSim.addEventListener('input', () => {
   simVal.textContent = sliderSim.value + '%'
 })
 
-// ── Elegir carpeta ────────────────────────────────
+// ── Añadir carpeta ────────────────────────────────
 btnFolder.addEventListener('click', async () => {
   const folder = await SelectFolder()
   if (!folder) return
-  selectedFolder = folder
-  folderPath.textContent = folder
-  folderPath.title = folder
+  // Evitar duplicados
+  if (selectedFolders.some(f => f.toLowerCase() === folder.toLowerCase())) return
+  selectedFolders.push(folder)
+  renderFolderList()
   btnScan.disabled = false
 })
 
+function renderFolderList() {
+  if (selectedFolders.length === 0) {
+    folderListEmpty.style.display = 'block'
+    folderList.querySelectorAll('.folder-item').forEach(el => el.remove())
+    btnScan.disabled = true
+    return
+  }
+  folderListEmpty.style.display = 'none'
+  // Rebuild list
+  folderList.querySelectorAll('.folder-item').forEach(el => el.remove())
+  selectedFolders.forEach((folder, i) => {
+    const li = document.createElement('li')
+    li.className = 'folder-item'
+    li.innerHTML = `
+      <span class="folder-item-path" title="${escHtml(folder)}">${escHtml(folder)}</span>
+      <button class="folder-item-remove" data-index="${i}" title="Eliminar">
+        <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+          <line x1="2" y1="2" x2="10" y2="10"/>
+          <line x1="10" y1="2" x2="2" y2="10"/>
+        </svg>
+      </button>
+    `
+    li.querySelector('.folder-item-remove').addEventListener('click', () => {
+      selectedFolders.splice(i, 1)
+      renderFolderList()
+    })
+    folderList.appendChild(li)
+  })
+}
+
 // ── Escanear ──────────────────────────────────────
 btnScan.addEventListener('click', async () => {
-  if (!selectedFolder) return
+  if (selectedFolders.length === 0) return
   const pct = parseInt(sliderSim.value)
   const threshold = Math.round((100 - pct) * 0.64)
   scanCancelled = false
   showProgress()
   try {
-    const result = await Scan(selectedFolder, threshold)
+    const result = await Scan(selectedFolders, threshold)
     if (scanCancelled) { showEmpty(); return }
     scanResults = result
     showResults(result)
@@ -130,7 +163,7 @@ function showEmpty() {
   progressState.style.display = 'none'
   resultsArea.style.display   = 'none'
   btnScan.classList.remove('scanning')
-  btnScan.disabled    = !selectedFolder
+  btnScan.disabled    = selectedFolders.length === 0
   btnScan.textContent = 'Escanear'
   btnCancel.style.display = 'none'
 }
@@ -507,24 +540,30 @@ async function loadHistory() {
   }
 
   historySection.style.display = 'block'
-  historyList.innerHTML = entries.map(e => `
-    <li class="history-item" data-folder="${escHtml(e.folder)}">
-      <div class="history-item-folder" title="${escHtml(e.folder)}">${escHtml(e.folder)}</div>
+  historyList.innerHTML = entries.map(e => {
+    // Compatibilidad con entradas antiguas que tenían 'folder' en vez de 'folders'
+    const folders = e.folders || (e.folder ? [e.folder] : [])
+    if (!folders.length) return ''
+    const label = folders.length === 1
+      ? folders[0]
+      : `${folders[0]} +${folders.length - 1} más`
+    const title = folders.join('\n')
+    return `
+    <li class="history-item" data-folders="${escHtml(JSON.stringify(folders))}">
+      <div class="history-item-folder" title="${escHtml(title)}">${escHtml(label)}</div>
       <div class="history-item-meta">
         <span>${escHtml(e.scannedAt)}</span>
         <span class="history-item-groups">${e.groups} grupo${e.groups !== 1 ? 's' : ''}</span>
       </div>
-    </li>
-  `).join('')
+    </li>`
+  }).join('')
 
   historyList.querySelectorAll('.history-item').forEach(el => {
     el.addEventListener('click', () => {
-      const folder = el.dataset.folder
-      selectedFolder = folder
-      folderPath.textContent = folder
-      folderPath.title = folder
+      const folders = JSON.parse(el.dataset.folders)
+      selectedFolders = folders
+      renderFolderList()
       btnScan.disabled = false
-      // Lanzar escaneo automáticamente
       btnScan.click()
     })
   })

@@ -71,9 +71,9 @@ type ProgressDTO struct {
 }
 
 type HistoryEntryDTO struct {
-	Folder    string `json:"folder"`
-	ScannedAt string `json:"scannedAt"` // formateado para mostrar
-	Groups    int    `json:"groups"`
+	Folders   []string `json:"folders"`
+	ScannedAt string   `json:"scannedAt"`
+	Groups    int      `json:"groups"`
 }
 
 // ── Metodos expuestos a JavaScript ────────────────────────────────────────
@@ -92,8 +92,8 @@ func (a *App) SelectFolder() string {
 // Scan lanza el escaneo en la carpeta dada.
 // Emite eventos "scan:progress" durante el proceso y devuelve el resultado final.
 // Si se llama a CancelScan() mientras está en curso, devuelve error "cancelado".
-func (a *App) Scan(rootDir string, similarityThreshold int) (*ScanResultDTO, error) {
-	if rootDir == "" {
+func (a *App) Scan(rootDirs []string, similarityThreshold int) (*ScanResultDTO, error) {
+	if len(rootDirs) == 0 {
 		return nil, fmt.Errorf("no se ha seleccionado ninguna carpeta")
 	}
 
@@ -112,7 +112,6 @@ func (a *App) Scan(rootDir string, similarityThreshold int) (*ScanResultDTO, err
 
 	// Emitir progreso al frontend via eventos Wails
 	a.scanner.OnProgress = func(done, total int) {
-		// Si ya fue cancelado no emitir más eventos
 		select {
 		case <-scanCtx.Done():
 			return
@@ -129,7 +128,7 @@ func (a *App) Scan(rootDir string, similarityThreshold int) (*ScanResultDTO, err
 		})
 	}
 
-	result, err := a.scanner.Scan(rootDir)
+	result, err := a.scanner.Scan(rootDirs)
 	if err != nil {
 		return nil, err
 	}
@@ -137,8 +136,8 @@ func (a *App) Scan(rootDir string, similarityThreshold int) (*ScanResultDTO, err
 	a.lastScan = result
 	dto := toDTO(result)
 
-	// Guardar en historial (sin duplicar la misma carpeta)
-	addToHistory(rootDir, dto.GroupCount)
+	// Guardar en historial — usamos la primera carpeta como clave
+	addToHistory(rootDirs, dto.GroupCount)
 
 	return dto, nil
 }
@@ -149,7 +148,7 @@ func (a *App) GetHistory() []HistoryEntryDTO {
 	result := make([]HistoryEntryDTO, len(entries))
 	for i, e := range entries {
 		result[i] = HistoryEntryDTO{
-			Folder:    e.Folder,
+			Folders:   e.Folders,
 			ScannedAt: e.ScannedAt.Format("02/01/2006 15:04"),
 			Groups:    e.Groups,
 		}

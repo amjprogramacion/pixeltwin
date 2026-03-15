@@ -4,20 +4,20 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 	"time"
 )
 
 const historyFile = "pixeltwin_history.json"
-const historyMax  = 10 // máximo de entradas únicas a guardar
+const historyMax  = 10
 
-// HistoryEntry representa un escaneo pasado.
 type HistoryEntry struct {
-	Folder    string    `json:"folder"`
+	Folders   []string  `json:"folders"`
 	ScannedAt time.Time `json:"scannedAt"`
-	Groups    int       `json:"groups"` // nº de grupos de duplicados encontrados
+	Groups    int       `json:"groups"`
 }
 
-// historyPath devuelve la ruta al archivo JSON en %APPDATA%\PixelTwin\
 func historyPath() string {
 	appData := os.Getenv("APPDATA")
 	if appData == "" {
@@ -28,7 +28,6 @@ func historyPath() string {
 	return filepath.Join(dir, historyFile)
 }
 
-// loadHistory lee el historial desde disco. Devuelve slice vacío si no existe.
 func loadHistory() []HistoryEntry {
 	data, err := os.ReadFile(historyPath())
 	if err != nil {
@@ -41,7 +40,6 @@ func loadHistory() []HistoryEntry {
 	return entries
 }
 
-// saveHistory escribe el historial a disco.
 func saveHistory(entries []HistoryEntry) {
 	data, err := json.MarshalIndent(entries, "", "  ")
 	if err != nil {
@@ -50,38 +48,39 @@ func saveHistory(entries []HistoryEntry) {
 	os.WriteFile(historyPath(), data, 0644)
 }
 
-// addToHistory añade una entrada al historial.
-// Si ya existe la misma carpeta, actualiza esa entrada en lugar de duplicarla.
-// Mantiene las entradas ordenadas de más reciente a más antigua.
-func addToHistory(folder string, groups int) []HistoryEntry {
-	entries := loadHistory()
+// foldersKey genera una clave normalizada y ordenada para comparar conjuntos de carpetas
+func foldersKey(folders []string) string {
+	norm := make([]string, len(folders))
+	for i, f := range folders {
+		norm[i] = strings.ToLower(filepath.Clean(filepath.ToSlash(f)))
+	}
+	sort.Strings(norm)
+	return strings.Join(norm, "|")
+}
 
-	// Eliminar entrada previa de la misma carpeta si existe
+func addToHistory(folders []string, groups int) []HistoryEntry {
+	entries := loadHistory()
+	key := foldersKey(folders)
+
+	// Eliminar entrada previa con el mismo conjunto de carpetas
 	filtered := entries[:0]
 	for _, e := range entries {
-		if !pathEqual(e.Folder, folder) {
+		if foldersKey(e.Folders) != key {
 			filtered = append(filtered, e)
 		}
 	}
 
-	// Insertar al principio (más reciente primero)
 	entry := HistoryEntry{
-		Folder:    folder,
+		Folders:   folders,
 		ScannedAt: time.Now(),
 		Groups:    groups,
 	}
 	entries = append([]HistoryEntry{entry}, filtered...)
 
-	// Recortar al máximo
 	if len(entries) > historyMax {
 		entries = entries[:historyMax]
 	}
 
 	saveHistory(entries)
 	return entries
-}
-
-// pathEqual compara rutas ignorando mayúsculas/minúsculas (Windows es case-insensitive)
-func pathEqual(a, b string) bool {
-	return filepath.Clean(filepath.ToSlash(a)) == filepath.Clean(filepath.ToSlash(b))
 }

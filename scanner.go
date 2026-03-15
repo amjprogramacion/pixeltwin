@@ -105,18 +105,31 @@ func NewScanner() *Scanner {
 	}
 }
 
-func (s *Scanner) Scan(rootDir string) (*ScanResult, error) {
+func (s *Scanner) Scan(rootDirs []string) (*ScanResult, error) {
 	start := time.Now()
 
 	// Cargar caché de hashes al inicio (no-op si ya está cargada)
 	globalCache.Load()
 
-	fmt.Printf("Buscando imagenes en: %s\n", rootDir)
-	paths, err := collectImagePaths(rootDir)
-	if err != nil {
-		return nil, fmt.Errorf("error al escanear directorio: %w", err)
+	// Recoger imágenes de todas las carpetas, deduplicando rutas
+	seen := make(map[string]bool)
+	var paths []string
+	for _, rootDir := range rootDirs {
+		fmt.Printf("Buscando imagenes en: %s\n", rootDir)
+		dirPaths, err := collectImagePaths(rootDir)
+		if err != nil {
+			fmt.Printf("Error escaneando %s: %v\n", rootDir, err)
+			continue
+		}
+		for _, p := range dirPaths {
+			norm := normPath(p)
+			if !seen[norm] {
+				seen[norm] = true
+				paths = append(paths, p)
+			}
+		}
 	}
-	fmt.Printf("Encontradas %d imagenes\n", len(paths))
+	fmt.Printf("Encontradas %d imagenes en total\n", len(paths))
 
 	images := s.processImages(paths)
 
