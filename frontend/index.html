@@ -86,7 +86,29 @@
         <ul class="history-list" id="historyList" style="display:none"></ul>
       </div>
 
-      <div class="app-version" id="appVersion"></div>
+      <div class="sidebar-footer">
+        <div class="app-actions">
+          <button class="btn-app-action" id="btnClearCache" title="Eliminar caché de hashes">
+            <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="1,4 3,2 5,4"/>
+              <path d="M3,2 C3,8 7,10 13,10"/>
+              <polyline points="13,10 11,8 9,10"/>
+            </svg>
+            Limpiar caché
+          </button>
+          <button class="btn-app-action" id="btnClearHistory" title="Eliminar historial de escaneos">
+            <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="2,4 4,2 6,4"/>
+              <path d="M4,2 Q4,7 7,7 Q10,7 10,11"/>
+              <line x1="2" y1="11" x2="12" y2="11"/>
+            </svg>
+            Limpiar historial
+          </button>
+        </div>
+        <div class="app-version" id="appVersion"></div>
+      </div>
     </aside>
 
     <!-- MAIN -->

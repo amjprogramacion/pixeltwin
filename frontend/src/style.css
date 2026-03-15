@@ -46,7 +46,6 @@ body {
   flex-direction: column;
   gap: 0;
   overflow-y: auto;
-  padding-bottom: 20px;
 }
 
 .logo {
@@ -181,7 +180,8 @@ body {
   color: var(--text);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  padding: 7px 12px;
+  height: 36px;
+  padding: 0 12px;
   cursor: pointer;
   font-size: 12px;
   transition: background .15s, border-color .15s;
@@ -201,7 +201,8 @@ body {
   color: #fff;
   border: none;
   border-radius: var(--radius-sm);
-  padding: 9px 12px;
+  height: 36px;
+  padding: 0 12px;
   cursor: pointer;
   font-size: 13px;
   font-weight: 600;
@@ -834,13 +835,14 @@ body {
 
 /* ── Botón cancelar escaneo ───────────────────────── */
 .btn-cancel {
-  margin: 8px 0 0;
+  margin: 0;
   width: 100%;
   background: transparent;
   color: var(--red);
   border: 1px solid var(--red);
   border-radius: var(--radius-sm);
-  padding: 7px 12px;
+  height: 36px;
+  padding: 0 12px;
   cursor: pointer;
   font-size: 12px;
   font-weight: 500;
@@ -852,12 +854,19 @@ body {
 }
 
 /* ── Versión en sidebar ───────────────────────────── */
-.app-version {
+.sidebar-footer {
   margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--border);
+}
+
+.app-version {
   text-align: center;
   font-size: 14px;
   color: var(--accent);
   letter-spacing: .05em;
+  padding: 8px 16px;
 }
 
 /* ── Historial de escaneos ───────────────────────── */
@@ -929,3 +938,35 @@ body {
   color: var(--accent);
   font-weight: 500;
 }
+
+/* ── Botones de acción del footer ─────────────────── */
+.app-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 16px 0;
+}
+
+.btn-app-action {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text3);
+  font-size: 11px;
+  padding: 0 10px;
+  cursor: pointer;
+  transition: color .15s, border-color .15s, background .15s;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.btn-app-action:hover {
+  color: var(--text);
+  border-color: var(--text3);
+  background: var(--bg3);
+}
+.btn-app-action svg { width: 13px; height: 13px; flex-shrink: 0; }

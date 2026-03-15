@@ -174,6 +174,16 @@ func (a *App) DeleteFiles(paths []string) []string {
 	return []string{}
 }
 
+// ClearCache elimina la caché de hashes del disco.
+func (a *App) ClearCache() {
+	globalCache.Clear()
+}
+
+// ClearHistory elimina el historial de escaneos del disco.
+func (a *App) ClearHistory() {
+	saveHistory([]HistoryEntry{})
+}
+
 // OpenFile abre un archivo con el programa predeterminado de Windows.
 func (a *App) OpenFile(path string) error {
 	return openWithDefault(path)

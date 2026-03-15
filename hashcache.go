@@ -139,6 +139,16 @@ func (c *HashCache) Prune(scannedPaths map[string]bool) {
 	}
 }
 
+// Clear vacía la caché en memoria y borra el archivo del disco.
+func (c *HashCache) Clear() {
+	c.mu.Lock()
+	c.entries = make(map[string]CacheEntry)
+	c.dirty = false
+	c.mu.Unlock()
+	os.Remove(cachePath())
+	fmt.Println("[cache] caché eliminada")
+}
+
 func normPath(p string) string {
 	return filepath.Clean(filepath.ToSlash(p))
 }

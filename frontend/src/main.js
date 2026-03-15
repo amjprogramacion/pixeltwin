@@ -1,4 +1,4 @@
-import { SelectFolder, Scan, CancelScan, DeleteFiles, OpenFile, GetHistory } from '../wailsjs/go/main/App.js'
+import { SelectFolder, Scan, CancelScan, DeleteFiles, OpenFile, GetHistory, ClearCache, ClearHistory } from '../wailsjs/go/main/App.js'
 import { EventsOn } from '../wailsjs/runtime/runtime.js'
 
 // ── Estado global ─────────────────────────────────
@@ -41,6 +41,8 @@ const modalOverlay   = document.getElementById('modalOverlay')
 const modalMsg       = document.getElementById('modalMsg')
 const modalCancel    = document.getElementById('modalCancel')
 const modalConfirm   = document.getElementById('modalConfirm')
+const btnClearCache   = document.getElementById('btnClearCache')
+const btnClearHistory = document.getElementById('btnClearHistory')
 const historySection  = document.getElementById('historySection')
 const historyToggle   = document.getElementById('historyToggle')
 const historyList     = document.getElementById('historyList')
@@ -162,6 +164,7 @@ function showEmpty() {
   emptyState.style.display    = 'flex'
   progressState.style.display = 'none'
   resultsArea.style.display   = 'none'
+  btnScan.style.display = 'block'
   btnScan.classList.remove('scanning')
   btnScan.disabled    = selectedFolders.length === 0
   btnScan.textContent = 'Escanear'
@@ -176,9 +179,7 @@ function showProgress() {
   progressDone.textContent    = '0'
   progressTotal.textContent   = '?'
   progressPct.textContent     = '0%'
-  btnScan.disabled    = true
-  btnScan.classList.add('scanning')
-  btnScan.textContent = 'Escaneando…'
+  btnScan.style.display = 'none'
   btnCancel.disabled    = false
   btnCancel.textContent = 'Parar escaneo'
   btnCancel.style.display = 'block'
@@ -188,6 +189,7 @@ function showResults(result) {
   emptyState.style.display    = 'none'
   progressState.style.display = 'none'
   resultsArea.style.display   = 'block'
+  btnScan.style.display = 'block'
   btnScan.classList.remove('scanning')
   btnScan.disabled    = false
   btnScan.textContent = 'Escanear de nuevo'
@@ -572,6 +574,20 @@ async function loadHistory() {
 historyToggle.addEventListener('click', () => {
   const isOpen = historyToggle.classList.toggle('open')
   historyList.style.display = isOpen ? 'block' : 'none'
+})
+
+// ── Acciones de mantenimiento ─────────────────────
+btnClearCache.addEventListener('click', async () => {
+  await ClearCache()
+  btnClearCache.textContent = '✓ Caché eliminada'
+  setTimeout(() => { btnClearCache.innerHTML = `<svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1,4 3,2 5,4"/><path d="M3,2 C3,8 7,10 13,10"/><polyline points="13,10 11,8 9,10"/></svg> Limpiar caché` }, 2000)
+})
+
+btnClearHistory.addEventListener('click', async () => {
+  await ClearHistory()
+  historySection.style.display = 'none'
+  btnClearHistory.textContent = '✓ Historial eliminado'
+  setTimeout(() => { btnClearHistory.innerHTML = `<svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,4 4,2 6,4"/><path d="M4,2 Q4,7 7,7 Q10,7 10,11"/><line x1="2" y1="11" x2="12" y2="11"/></svg> Limpiar historial` }, 2000)
 })
 
 // ── Util ──────────────────────────────────────────
