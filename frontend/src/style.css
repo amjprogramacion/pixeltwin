@@ -970,3 +970,12 @@ body {
   background: var(--bg3);
 }
 .btn-app-action svg { width: 13px; height: 13px; flex-shrink: 0; }
+
+/* ── Tiempo restante en progreso ─────────────────── */
+.progress-remaining {
+  font-size: 11px;
+  color: var(--text3);
+  text-align: center;
+  margin-top: 4px;
+  min-height: 16px;
+}

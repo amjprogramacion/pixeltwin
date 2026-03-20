@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/md5"
 	"fmt"
 	"image"
 	_ "image/gif"
@@ -10,7 +11,9 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/disintegration/imaging"
 	"github.com/rwcarlsen/goexif/exif"
@@ -18,6 +21,39 @@ import (
 	_ "golang.org/x/image/tiff"
 	_ "golang.org/x/image/webp"
 )
+
+// ── Caché de miniaturas en disco ──────────────────────────────────────────
+
+var thumbCacheDir string
+var thumbCacheOnce sync.Once
+
+// initThumbCache inicializa la carpeta de caché de miniaturas en %APPDATA%\PixelTwin\thumbs\
+func initThumbCache() string {
+	thumbCacheOnce.Do(func() {
+		appData := os.Getenv("APPDATA")
+		if appData == "" {
+			appData = "."
+		}
+		thumbCacheDir = filepath.Join(appData, "PixelTwin", "thumbs")
+		os.MkdirAll(thumbCacheDir, 0755)
+	})
+	return thumbCacheDir
+}
+
+// thumbCachePath devuelve la ruta en disco para una miniatura dada.
+// La clave es un MD5 de "ruta|tamaño|modtime" para invalidar automáticamente
+// si el archivo original cambia.
+func thumbCachePath(path string, size int) (string, error) {
+	stat, err := os.Stat(path)
+	if err != nil {
+		return "", err
+	}
+	key := fmt.Sprintf("%s|%d|%d", path, size, stat.ModTime().UnixNano())
+	hash := fmt.Sprintf("%x", md5.Sum([]byte(key)))
+	return filepath.Join(initThumbCache(), hash+".jpg"), nil
+}
+
+// ── Handler HTTP ──────────────────────────────────────────────────────────
 
 type ThumbHandler struct {
 	next http.Handler
@@ -46,14 +82,27 @@ func (h *ThumbHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		decoded = rawPath
 	}
 
-	// Tamaño: 320px para miniaturas, 1200px para el lightbox
 	size := 320
 	if r.URL.Query().Get("size") == "1200" {
 		size = 1200
 	}
 
-	fmt.Printf("[thumb] solicitada: %s (size=%d)\n", decoded, size)
+	// ── Intentar servir desde caché en disco ──
+	cachePath, err := thumbCachePath(decoded, size)
+	if err == nil {
+		if data, err := os.ReadFile(cachePath); err == nil {
+			// Cache hit — servir directamente sin procesar nada
+			w.Header().Set("Content-Type", "image/jpeg")
+			w.Header().Set("Cache-Control", "private, max-age=86400")
+			w.Header().Set("Content-Length", fmt.Sprintf("%d", len(data)))
+			w.WriteHeader(http.StatusOK)
+			w.Write(data)
+			return
+		}
+	}
 
+	// ── Cache miss — generar miniatura ────────
+	fmt.Printf("[thumb] generando: %s (size=%d)\n", decoded, size)
 	thumb, err := generateThumb(decoded, size)
 	if err != nil {
 		fmt.Printf("[thumb] ERROR: %v\n", err)
@@ -61,22 +110,20 @@ func (h *ThumbHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Printf("[thumb] OK %d bytes\n", len(thumb))
+	// Guardar en caché para próximas peticiones (async para no bloquear la respuesta)
+	if cachePath != "" {
+		go os.WriteFile(cachePath, thumb, 0644)
+	}
+
 	w.Header().Set("Content-Type", "image/jpeg")
-	w.Header().Set("Cache-Control", "private, max-age=3600")
+	w.Header().Set("Cache-Control", "private, max-age=86400")
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(thumb)))
 	w.WriteHeader(http.StatusOK)
 	w.Write(thumb)
 }
 
-// exifOrientation lee el tag Orientation del EXIF de un archivo.
-// Devuelve 1 (sin rotación) si no hay EXIF o si falla la lectura.
-// Valores posibles:
-//   1 = normal
-//   3 = rotada 180°
-//   6 = rotada 90° CW  (lo más común en fotos de móvil en vertical)
-//   8 = rotada 90° CCW
-//   2,4,5,7 = variantes con espejo (raro en cámaras normales)
+// ── Generación de miniaturas ──────────────────────────────────────────────
+
 func exifOrientation(path string) int {
 	f, err := os.Open(path)
 	if err != nil {
@@ -88,12 +135,10 @@ func exifOrientation(path string) int {
 	if err != nil {
 		return 1
 	}
-
 	tag, err := x.Get(exif.Orientation)
 	if err != nil {
 		return 1
 	}
-
 	val, err := tag.Int(0)
 	if err != nil {
 		return 1
@@ -101,7 +146,6 @@ func exifOrientation(path string) int {
 	return val
 }
 
-// applyOrientation rota/espeja la imagen según el valor EXIF Orientation.
 func applyOrientation(img image.Image, orientation int) image.Image {
 	switch orientation {
 	case 2:
@@ -119,17 +163,15 @@ func applyOrientation(img image.Image, orientation int) image.Image {
 	case 8:
 		return imaging.Rotate90(img)
 	default:
-		return img // 1 = normal, sin cambios
+		return img
 	}
 }
 
-// generateThumb decodifica, corrige orientación EXIF y redimensiona la imagen.
 func generateThumb(path string, maxW int) ([]byte, error) {
 	var src image.Image
 	var err error
 
 	if isHEIC(path) {
-		// HEIC: ImageMagick ya aplica la orientación al convertir
 		src, err = decodeHEIC(path)
 		if err != nil {
 			return nil, fmt.Errorf("decode heic: %w", err)
@@ -146,13 +188,10 @@ func generateThumb(path string, maxW int) ([]byte, error) {
 			return nil, fmt.Errorf("decode: %w", err)
 		}
 
-		// Leer y aplicar orientación EXIF
-		// (solo para JPEG/TIFF que pueden tener EXIF — para el resto devuelve 1)
 		orientation := exifOrientation(path)
 		src = applyOrientation(src, orientation)
 	}
 
-	// Redimensionar a maxW px de ancho manteniendo proporción
 	bounds := src.Bounds()
 	if bounds.Dx() > maxW {
 		src = imaging.Resize(src, maxW, 0, imaging.Lanczos)

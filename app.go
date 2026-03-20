@@ -6,7 +6,10 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
+
+	goruntime "runtime"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -17,7 +20,7 @@ type App struct {
 	ctx        context.Context
 	scanner    *Scanner
 	lastScan   *ScanResult
-	cancelScan context.CancelFunc // cancela el escaneo en curso, nil si no hay ninguno
+	cancelScan context.CancelFunc
 }
 
 func NewApp() *App {
@@ -28,8 +31,17 @@ func NewApp() *App {
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
-	// Precargar caché de hashes para que el primer escaneo sea rápido
 	go globalCache.Load()
+}
+
+// beforeClose se llama cuando el usuario cierra la ventana.
+// Cancela cualquier escaneo en curso y guarda la caché antes de salir.
+func (a *App) beforeClose(ctx context.Context) bool {
+	if a.cancelScan != nil {
+		a.cancelScan()
+	}
+	globalCache.Save()
+	return false // false = permitir el cierre
 }
 
 // ── Tipos que viajan entre Go y JavaScript (JSON) ──────────────────────────
@@ -64,10 +76,11 @@ type ScanResultDTO struct {
 }
 
 type ProgressDTO struct {
-	Done    int    `json:"done"`
-	Total   int    `json:"total"`
-	Percent int    `json:"percent"`
-	Current string `json:"current"` // nombre del archivo actual
+	Done      int    `json:"done"`
+	Total     int    `json:"total"`
+	Percent   int    `json:"percent"`
+	Current   string `json:"current"`
+	Remaining string `json:"remaining"` // tiempo restante estimado, "" si no disponible
 }
 
 type HistoryEntryDTO struct {
@@ -107,10 +120,15 @@ func (a *App) Scan(rootDirs []string, similarityThreshold int) (*ScanResultDTO, 
 	defer func() { a.cancelScan = nil }()
 
 	a.scanner.SimilarityThreshold = similarityThreshold
-	a.scanner.Workers = 8
+	workers := goruntime.NumCPU()
+	if workers > 8 {
+		workers = 8
+	}
+	a.scanner.Workers = workers
 	a.scanner.Ctx = scanCtx
 
 	// Emitir progreso al frontend via eventos Wails
+	scanStart := time.Now()
 	a.scanner.OnProgress = func(done, total int) {
 		select {
 		case <-scanCtx.Done():
@@ -121,10 +139,36 @@ func (a *App) Scan(rootDirs []string, similarityThreshold int) (*ScanResultDTO, 
 		if total > 0 {
 			pct = done * 100 / total
 		}
+
+		// Calcular tiempo restante estimado
+		remaining := ""
+		if done > 0 && done < total {
+			elapsed := time.Since(scanStart)
+			avgPerFile := elapsed / time.Duration(done)
+			left := avgPerFile * time.Duration(total-done)
+			// Redondear a segundos para evitar saltos
+			left = left.Round(time.Second)
+			switch {
+			case left < time.Minute:
+				remaining = fmt.Sprintf("%ds", int(left.Seconds()))
+			case left < time.Hour:
+				m := int(left.Minutes())
+				s := int(left.Seconds()) % 60
+				if s > 0 {
+					remaining = fmt.Sprintf("%dm %ds", m, s)
+				} else {
+					remaining = fmt.Sprintf("%dm", m)
+				}
+			default:
+				remaining = fmt.Sprintf("%dh %dm", int(left.Hours()), int(left.Minutes())%60)
+			}
+		}
+
 		runtime.EventsEmit(a.ctx, "scan:progress", ProgressDTO{
-			Done:    done,
-			Total:   total,
-			Percent: pct,
+			Done:      done,
+			Total:     total,
+			Percent:   pct,
+			Remaining: remaining,
 		})
 	}
 
@@ -179,6 +223,16 @@ func (a *App) ClearCache() {
 	globalCache.Clear()
 }
 
+// ClearThumbs elimina la caché de miniaturas del disco.
+func (a *App) ClearThumbs() {
+	dir := initThumbCache()
+	entries, _ := os.ReadDir(dir)
+	for _, e := range entries {
+		os.Remove(filepath.Join(dir, e.Name()))
+	}
+	fmt.Printf("[thumbs] caché de miniaturas eliminada (%d archivos)\n", len(entries))
+}
+
 // ClearHistory elimina el historial de escaneos del disco.
 func (a *App) ClearHistory() {
 	saveHistory([]HistoryEntry{})
@@ -230,13 +284,28 @@ func toDTO(r *ScanResult) *ScanResultDTO {
 		})
 	}
 
-	// Ordenar: exactos primero, luego similares
+	// Ordenar: exactos primero, luego similares.
+	// Dentro de cada tipo, por nombre del archivo original (images[0])
+	// para que los grupos aparezcan en orden alfabético/cronológico natural.
 	sort.Slice(groups, func(i, j int) bool {
 		if groups[i].GroupType != groups[j].GroupType {
 			return groups[i].GroupType == "exact"
 		}
-		return groups[i].ID < groups[j].ID
+		nameI := ""
+		nameJ := ""
+		if len(groups[i].Images) > 0 {
+			nameI = strings.ToLower(groups[i].Images[0].Filename)
+		}
+		if len(groups[j].Images) > 0 {
+			nameJ = strings.ToLower(groups[j].Images[0].Filename)
+		}
+		return nameI < nameJ
 	})
+
+	// Renumerar grupos según el orden final
+	for i := range groups {
+		groups[i].ID = i + 1
+	}
 
 	return &ScanResultDTO{
 		TotalFound:   r.TotalFound,

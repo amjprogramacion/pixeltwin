@@ -25,7 +25,8 @@ const progressState  = document.getElementById('progressState')
 const progressFill   = document.getElementById('progressFill')
 const progressDone   = document.getElementById('progressDone')
 const progressTotal  = document.getElementById('progressTotal')
-const progressPct    = document.getElementById('progressPct')
+const progressPct       = document.getElementById('progressPct')
+const progressRemaining = document.getElementById('progressRemaining')
 const resultsArea    = document.getElementById('resultsArea')
 const groupsList     = document.getElementById('groupsList')
 const statsSection   = document.getElementById('statsSection')
@@ -142,10 +143,11 @@ btnCancel.addEventListener('click', async () => {
 
 // ── Progreso ──────────────────────────────────────
 EventsOn('scan:progress', (data) => {
-  progressFill.style.width  = data.percent + '%'
-  progressDone.textContent  = data.done
-  progressTotal.textContent = data.total
-  progressPct.textContent   = data.percent + '%'
+  progressFill.style.width       = data.percent + '%'
+  progressDone.textContent       = data.done
+  progressTotal.textContent      = data.total
+  progressPct.textContent        = data.percent + '%'
+  progressRemaining.textContent  = data.remaining ? 'Tiempo restante: ' + data.remaining : ''
 })
 
 // ── Modo selección múltiple ───────────────────────
@@ -179,6 +181,7 @@ function showProgress() {
   progressDone.textContent    = '0'
   progressTotal.textContent   = '?'
   progressPct.textContent     = '0%'
+  progressRemaining.textContent = ''
   btnScan.style.display = 'none'
   btnCancel.disabled    = false
   btnCancel.textContent = 'Parar escaneo'

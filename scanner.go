@@ -282,13 +282,26 @@ func processImage(path string) *ImageInfo {
 	info.SHA256 = hex.EncodeToString(hasher.Sum(nil))
 
 	// Decodificar para pHash y dimensiones
+	// Para HEIC usamos una versión reducida a 512px — suficiente para pHash
+	// y mucho más ligero que decodificar los 12MP completos
 	var img image.Image
 	if isHEIC(path) {
-		// decodeHEIC vive en heic.go y usa el magick.exe embebido
-		img, err = decodeHEIC(path)
+		// Obtener dimensiones reales via magick identify — sin decodificar píxeles
+		if w, h, e := heicDimensions(path); e == nil {
+			info.Width  = w
+			info.Height = h
+		}
+		// Para pHash usamos versión reducida — mucho menos RAM
+		img, err = decodeHEICSmall(path, 512)
 		if err != nil {
 			info.Error = fmt.Sprintf("heic: %s", err)
 			return info
+		}
+		// Fallback si identify falló
+		if info.Width == 0 {
+			b := img.Bounds()
+			info.Width  = b.Dx()
+			info.Height = b.Dy()
 		}
 	} else {
 		f.Seek(0, io.SeekStart)
@@ -297,11 +310,10 @@ func processImage(path string) *ImageInfo {
 			info.Error = fmt.Sprintf("no se pudo decodificar: %s", err)
 			return info
 		}
+		bounds := img.Bounds()
+		info.Width  = bounds.Dx()
+		info.Height = bounds.Dy()
 	}
-
-	bounds := img.Bounds()
-	info.Width = bounds.Dx()
-	info.Height = bounds.Dy()
 
 	hash, err := goimagehash.PerceptionHash(img)
 	if err != nil {
